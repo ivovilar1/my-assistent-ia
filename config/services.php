@@ -40,5 +40,7 @@ return [
         'new_message_url' => env('TWILIO_NEW_MESSAGE_URL'),
         'from' => env('WHATS_APP_FROM')
     ],
-
+    'openai' => [
+        'auth_token' => env('OPENAI_TOKEN')
+    ],
 ];

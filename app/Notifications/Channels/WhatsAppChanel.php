@@ -37,12 +37,73 @@ use Twilio\Rest\Client;
                 ]
             );
         }
-        return $twilio->messages->create(
-            'whatsapp:' . $to,
-            [
-                'from' => 'whatsapp:' . $from,
-                'body' => $message->content
-            ]
-        );
+        $messages = $this->splitMessage($message->content);
+        $sends = [];
+        foreach($messages as $part) {
+            $twilio->messages->create(
+                'whatsapp:' . $to,
+                [
+                    'from' => 'whatsapp:' . $from,
+                    'body' => $part
+                ]
+            );
+        }
+        return $sends;
+    }
+
+    /**
+     * Metodo para quebrar as mensagens para nao limitar a reposta do chatgpt
+     * Exemplo: o tamanho da mensagem deu 3.200 caracteres, quebra em duas partes de 1.600
+     * @param $message
+     * @param int $maxLength
+     * @return array
+     */
+    protected function splitMessage($message, int $maxLength = 1600): array
+    {
+        $parts = [];
+        $lines = explode("\n", $message);
+        $currentPart = '';
+        foreach ($lines as $line) {
+            if (mb_strlen($line) > $maxLength) {
+                if (!empty($currentPart)) {
+                    $parts[] = $currentPart;
+                    $currentPart = '';
+                }
+
+                $words = explode(' ', $line);
+                $tempLine = '';
+
+                foreach ($words as $word) {
+                    if (mb_strlen($tempLine . ' ' . $word) <= $maxLength) {
+                        $tempLine .= (empty($tempLine) ? '' : ' ') . $word;
+                    } else {
+                        if (!empty($tempLine)) {
+                            $parts[] = $tempLine;
+                        }
+                        if (mb_strlen($word) > $maxLength) {
+                            $parts = array_merge($parts, str_split($word, $maxLength));
+                        } else {
+                            $tempLine = $word;
+                        }
+                    }
+                }
+
+                if (!empty($tempLine)) {
+                    $currentPart = $tempLine;
+                }
+
+            } else {
+                if (mb_strlen($currentPart . (!empty($currentPart) ? "\n" : '') . $line) > $maxLength) {
+                    $parts[] = $currentPart;
+                    $currentPart = $line;
+                } else {
+                    $currentPart .= (!empty($currentPart) ? "\n" : '') . $line;
+                }
+            }
+        }
+        if (!empty($currentPart)) {
+            $parts[] = $currentPart;
+        }
+        return $parts;
     }
 }
